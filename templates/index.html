@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommendations</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            color: #1a1a1a;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .nav {
+            background-color: #2c3e50;
+            padding: 1rem;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .auth-section {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .content {
+            display: none;
+        }
+
+        .active {
+            display: block;
+        }
+
+        .movie-card {
+            background: white;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .movie-title {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .votes {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .error {
+            color: red;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <h1>Movie Recommendations</h1>
+        <div class="auth-section">
+            <div id="loggedOutBtns">
+                <button onclick="showSection('login')">Login</button>
+                <button onclick="showSection('register')">Register</button>
+            </div>
+            <div id="loggedInBtns" style="display: none;">
+                <span id="username"></span>
+                <button onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div id="login" class="content">
+            <h2>Login</h2>
+            <form id="loginForm">
+                <input type="text" id="loginUsername" placeholder="Username" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+            <p id="loginError" class="error"></p>
+        </div>
+
+        <div id="register" class="content">
+            <h2>Register</h2>
+            <form id="registerForm">
+                <input type="text" id="registerUsername" placeholder="Username" required>
+                <input type="password" id="registerPassword" placeholder="Password" required>
+                <button type="submit">Register</button>
+            </form>
+            <p id="registerError" class="error"></p>
+        </div>
+
+        <div id="movies" class="content">
+            <h2>Movie Recommendations</h2>
+            <form id="movieForm">
+                <input type="text" id="movieTitle" placeholder="Movie Title" required>
+                <textarea id="movieDescription" placeholder="Why do you recommend this movie?" required></textarea>
+                <button type="submit">Add Recommendation</button>
+            </form>
+            <div id="movieList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.content').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+        }
+
+        function updateAuthUI() {
+            const loggedOutBtns = document.getElementById('loggedOutBtns');
+            const loggedInBtns = document.getElementById('loggedInBtns');
+            const username = document.getElementById('username');
+
+            if (currentUser) {
+                loggedOutBtns.style.display = 'none';
+                loggedInBtns.style.display = 'block';
+                username.textContent = currentUser;
+                showSection('movies');
+                loadMovies();
+            } else {
+                loggedOutBtns.style.display = 'block';
+                loggedInBtns.style.display = 'none';
+                showSection('login');
+            }
+        }
+
+        async function login(username, password) {
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    currentUser = username;
+                    updateAuthUI();
+                } else {
+                    document.getElementById('loginError').textContent = data.message;
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = 'An error occurred';
+            }
+        }
+
+        async function register(username, password) {
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    currentUser = username;
+                    updateAuthUI();
+                } else {
+                    document.getElementById('registerError').textContent = data.message;
+                }
+            } catch (error) {
+                document.getElementById('registerError').textContent = 'An error occurred';
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            updateAuthUI();
+        }
+
+        async function loadMovies() {
+            try {
+                const response = await fetch('/movies');
+                const movies = await response.json();
+                const movieList = document.getElementById('movieList');
+                movieList.innerHTML = '';
+                
+                movies.forEach(movie => {
+                    const movieCard = document.createElement('div');
+                    movieCard.className = 'movie-card';
+                    movieCard.innerHTML = `
+                        <h3 class="movie-title">${movie.title}</h3>
+                        <p>${movie.description}</p>
+                        <p class="votes">Added by: ${movie.username}</p>
+                        <p class="votes">Votes: ${movie.votes}</p>
+                        <button onclick="voteMovie(${movie.id})">Vote</button>
+                    `;
+                    movieList.appendChild(movieCard);
+                });
+            } catch (error) {
+                console.error('Error loading movies:', error);
+            }
+        }
+
+        async function addMovie(title, description) {
+            try {
+                const response = await fetch('/movies', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title, description, username: currentUser }),
+                });
+                if (response.ok) {
+                    loadMovies();
+                    document.getElementById('movieForm').reset();
+                }
+            } catch (error) {
+                console.error('Error adding movie:', error);
+            }
+        }
+
+        async function voteMovie(movieId) {
+            try {
+                const response = await fetch(`/movies/${movieId}/vote`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username: currentUser }),
+                });
+                if (response.ok) {
+                    loadMovies();
+                }
+            } catch (error) {
+                console.error('Error voting:', error);
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            login(username, password);
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const password = document.getElementById('registerPassword').value;
+            register(username, password);
+        });
+
+        document.getElementById('movieForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('movieTitle').value;
+            const description = document.getElementById('movieDescription').value;
+            addMovie(title, description);
+        });
+
+        // Initialize UI
+        updateAuthUI();
+    </script>
+</body>
+</html>
